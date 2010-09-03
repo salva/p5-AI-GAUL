@@ -1,0 +1,8 @@
+Changes
+GAUL.xs
+Makefile.PL
+MANIFEST
+ppport.h
+README
+t/AI-GAUL.t
+lib/AI/GAUL.pm
