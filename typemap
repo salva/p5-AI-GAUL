@@ -1,0 +1,15 @@
+TYPEMAP
+population * T_POP
+
+INPUT
+T_POP
+        if (sv_isa($arg, \"AI::GAUL\")) {
+            IV tmp = SvIV((SV*)SvRV($arg));
+            $var = INT2PTR($type, tmp);
+        }
+        else
+            croak(\"$var is not of type AI::GAUL\");
+
+OUTPUT
+T_POP
+        sv_setref_pv($arg, \"AI::GAUL\", $var);
