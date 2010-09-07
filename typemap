@@ -13,3 +13,4 @@ T_POP
 OUTPUT
 T_POP
         sv_setref_pv($arg, \"AI::GAUL\", $var);
+        pop_data->wrapper = sv_rvweaken(newSVsv($arg));
