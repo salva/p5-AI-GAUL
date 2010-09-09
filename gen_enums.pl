@@ -23,7 +23,10 @@ my %cb = map { $_ => [] } qw(ga_select_one ga_select_two
                              ga_stop
                            );
 
-push @{$cb{$_}}, "_perl" for qw(ga_evaluate ga_adapt ga_stop);
+push @{$cb{$_}}, "_perl" for qw(ga_evaluate ga_adapt ga_stop
+                                ga_seed_bitstring ga_seed_boolean
+                                ga_seed_char ga_seed_integer
+                                ga_seed_double);
 
 my $base = '';
 my $table = '';
@@ -90,6 +93,7 @@ for my $cb_name (sort keys %cb) {
     for my $name (@cb) {
         my $cb = "${cb_name}_$name";
         $cb =~ s/_char_printable_/_printable_/;
+        $cb =~ s/_(bitstring|boolean|char|integer|double)__perl/__perl/;
         print $cb_out qq(    { "$name", (cb_C)&$cb },\n);
     }
     print $cb_out "    { NULL, 0 },\n};\n\n";

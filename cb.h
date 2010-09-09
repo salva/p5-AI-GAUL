@@ -38,13 +38,11 @@ ga_evaluate__perl(population *pop, entity *joe) {
     return ret;
 }
 
-static entity *
-ga_adapt__perl(population *pop, entity *child) {
+static boolean
+ga__mod__perl(population *pop, entity *joe, SV *perl_cb) {
     dSP;
     int i;
-    SV *perl_cb = pop_data->adapt_cb;
-    entity *adult = ga_entity_clone(pop, child);
-    byte **chromo = (byte **)adult->chromosome;
+    byte **chromo = (byte **)joe->chromosome;
     SV **svs = pop_data->chromosome_svs;
     int bytes = pop_data->chromosome_bytes;
 
@@ -73,10 +71,20 @@ ga_adapt__perl(population *pop, entity *child) {
             croak("invalid size %d for adapted chromosome, %d expected", len, bytes);
         Copy(pv, chromo[i], bytes, char);
     }
+    return 1;
+}
 
+static entity *
+ga_adapt__perl(population *pop, entity *child) {
+    entity *adult = ga_entity_clone(pop, child);
+    ga_mod__perl(pop, adult, pop_data->adapt_cb);
     ga_evaluate__perl(pop, adult);
-
     return adult;
+}
+
+static boolean
+ga_seed__perl(population *pop, entity *joe) {
+    ga_mod__perl(pop, joe, pop_data->seed_cb);
 }
 
 static boolean
