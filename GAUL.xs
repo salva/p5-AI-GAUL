@@ -41,7 +41,7 @@ get_chromosome_sv(population *pop, int i) {
     if (SvREFCNT(sv) > 1) {
         SV *alt = svs[pop->num_chromosomes];
         if (SvREFCNT(alt) > 1) {
-            fprintf(stderr, "(sv realloc)"); fflush(stderr);
+          // fprintf(stderr, "(sv realloc)"); fflush(stderr);
             sv_2mortal(sv);
             return pop_data->chromosome_svs[i] = newSV(pop_data->chromosome_bytes);
         }
@@ -270,19 +270,19 @@ CODE:
     if (SvOK(sv))
         ga_population_set_elitism(pop, sv_to_enum(sv, table_for_ga_elitism_type_t, "elitism", 0));
 
-    sv = delete_opt("crossover_prob");
+    sv = delete_opt("crossover_ratio");
     if (SvOK(sv))
         ga_population_set_crossover(pop, SvNV(sv));
 
-    sv = delete_opt("mutation_prob");
+    sv = delete_opt("mutation_ratio");
     if (SvOK(sv))
         ga_population_set_mutation(pop, SvNV(sv));
 
-    sv = delete_opt("migration_prob");
+    sv = delete_opt("migration_ratio");
     if (SvOK(sv))
         ga_population_set_mutation(pop, SvNV(sv));
 
-    sv = delete_opt("allele_mutation_prob");
+    sv = delete_opt("allele_mutation_ratio");
     if (SvOK(sv))
         ga_population_set_allele_mutation_prob(pop, SvNV(sv));
 
@@ -514,6 +514,14 @@ ga_num_chromo(pop)
     population *pop
 CODE:
     RETVAL = pop->num_chromosomes;
+OUTPUT:
+    RETVAL
+
+int
+ga_generation(pop)
+    population *pop
+CODE:
+    RETVAL = ga_population_get_generation(pop);
 OUTPUT:
     RETVAL
 
