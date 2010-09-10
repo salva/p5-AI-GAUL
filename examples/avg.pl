@@ -5,7 +5,7 @@ use warnings;
 
 use 5.010;
 
-use Bit::Grep qw(bg_count_and_sum);
+use Bit::Grep qw(bg_count_sum_and_sum2 bg_count_and_sum);
 use Bit::Util qw(bu_first bu_last);
 use List::Util qw(sum);
 use AI::GAUL;
@@ -21,96 +21,129 @@ $#size = 999;
 
 my $size = scalar @size;
 
-my ($bottom, $top) = (4000, 4100);
+my ($bottom, $top) = (1000, 1001);
 
-my $first = 0;
-my $last = $#size;
+my $naive = '';
+for (0..$#size) { vec($naive, $_, 1) = 1 };
+adapt(undef, $naive);
 
-my @cp = @size;
-my $sum = sum @size;
-while (@cp) {
-    my $avg = $sum / @cp;
-    if ($avg < $bottom) {
-        # say "deleting $cp[0]";
-        $sum -= shift @cp;
-        $first++;
-    }
-    elsif ($avg > $top) {
-        # say "deleting $cp[-1]";
-        $sum -= pop @cp;
-        $last--;
-    }
-    else {
-        last;
-    }
-}
+my ($cnt, $sum) = bg_count_and_sum($naive, @size);
 
 my $inside = grep { $_ >= $bottom and $_ <= $top } @size;
 
-if (@cp) {
-    say "naive solution: ", scalar @cp, " inside: $inside";
+if ($cnt) {
+    say "naive solution cnt: $cnt, inside: $inside";
 }
 else {
     say "no naive solution";
 }
 
-my $seed = '';
-vec($seed, $_, 1) = ($_ >= $first and $_ <= $last) for 0..$#size;
+my $last_pow = 0;
+
+my $iteration = 1;
+my $pow = 1;
 
 sub evaluate {
-    my ($cnt, $sum) = bg_count_and_sum($_[1], @size);
+    my ($cnt, $sum, $sum2) = bg_count_sum_and_sum2($_[1], @size);
     if ($cnt) {
         my $avg = $sum / $cnt;
-        $avg >= $bottom and $avg <= $top and return $cnt;
-        # warn "average $avg out of limits";
+        if ($avg >= $bottom and $avg <= $top) {
+            my $dev = ($sum2 - $avg * $avg) / $cnt;
+            return $cnt * $dev ** $pow;
+        }
         return undef;
     }
     return 0;
 }
 
+sub stop {
+    $iteration++;
+    $pow = 0.5 * $iteration ** -0.9;
+    undef;
+}
+
+sub find_le_ix {
+    my $n = shift;
+    my $l = -1;
+    my $r = $#size;
+    while ($l < $r) {
+        my $p = int(($l + $r + 1) / 2);
+        if ($size[$p] > $n) {
+            $r = $p - 1;
+        }
+        else {
+            $l = $p;
+        }
+    }
+    $l;
+}
+
+sub find_ge_ix {
+    my $n = shift;
+    my $l = 0;
+    my $r = @size;
+    while ($l < $r) {
+        my $p = int(($l + $r) / 2);
+        if ($size[$p] < $n) {
+            $l = $p + 1;
+        }
+        else {
+            $r = $p;
+        }
+    }
+    $l;
+}
+
 sub adapt {
     my ($cnt, $sum) = bg_count_and_sum($_[1], @size);
-    if ($cnt) {
+    while ($cnt) {
         my $avg = ($sum / $cnt);
-        if ($avg < $bottom or $avg > $top) {
-            my $first = bu_first($_[1]);
-            my $last = bu_last($_[1]);
+        if ($avg < $bottom) {
+            my $ix = find_le_ix($sum - $bottom * ($cnt - 1));
+            my $ix1 = bu_last($_[1], $ix) // bu_first($_[1], $ix) // die "internal error";
+            vec($_[1], $ix1, 1) = 0;
+            $sum -= $size[$ix1];
+            $cnt--;
+            # say "element at $ix1 ($size[$ix1]) deleted avg: $avg, cnt: $cnt, dir: <==";
 
-            while (1) {
-                my $avg = ($sum / $cnt);
-                if ($avg < $bottom) {
-                    vec($_[1], $first, 1) = 0;
-                    $sum -= $size[$first];
-                    $first = bu_first($_[1], $first+1);
-                    return if $first < 0;
-                }
-                elsif ($avg > $top) {
-                    vec($_[1], $last, 1) = 0;
-                    $sum -= $size[$last];
-                    $last = bu_last($_[1], $last - 1);
-                    return if $last < 0;
-                }
-                else {
-                    return;
-                }
-                $cnt--;
-            }
+        }
+        elsif ($avg > $top) {
+            my $ix = find_ge_ix($sum - $top * ($cnt - 1));
+            # my $last = bu_last($_[1]);
+            my $ix1 = bu_first($_[1], $ix) // bu_last($_[1], $ix) // die "internal error";
+            vec($_[1], $ix1, 1) = 0;
+            $sum -= $size[$ix1];
+            $cnt--;
+            # say "element at $ix1 ($size[$ix1]) deleted, last: $last, avg: $avg, cnt: $cnt, dir: ==>", ($last != $ix1 ? '*': '');
+        }
+        else {
+            # say "range reached, avg: $avg, cnt: $cnt";
+            return
         }
     }
 }
 
 my $pop = AI::GAUL->new(len_chromo => $size,
-                        population_size => 2000,
+                        population_size => 10000,
                         seed => "random",
-                        mutate_prob => 0.01,
+                        mutate_ratio => 0.02,
                         mutate => "multipoint",
+                        crossover => "allele_mixing",
                         evaluate => \&evaluate,
                         adapt => \&adapt,
+                        stop => \&stop,
                         scheme => "lamarck_children",
+                        elitism => "parents_die",
                         # seed => sub { $_[1] = $seed }
                        );
 
 while (1) {
-    $pop->evolution(1);
-    say $pop->fitness_from_rank(0), "/$size";
+    $pop->evolution(2);
+    my $chromo = $pop->chromosomes_from_rank(0);
+    my ($cnt, $sum, $sum2) = bg_count_sum_and_sum2($chromo, @size);
+    $cnt ||= 1;
+    my $avg = $sum / $cnt;
+    my $dev = ($sum2 - $avg * $avg) / $cnt;
+    say "$iteration $cnt/$size fit: ", $pop->fitness_from_rank(0), " avg: ", $avg, " dev1/2: ", sqrt($dev), " pow: ", $pow, " fact: ", $dev ** $pow;
+    
 }
