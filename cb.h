@@ -77,14 +77,14 @@ ga__mod__perl(population *pop, entity *joe, SV *perl_cb) {
 static entity *
 ga_adapt__perl(population *pop, entity *child) {
     entity *adult = ga_entity_clone(pop, child);
-    ga_mod__perl(pop, adult, pop_data->adapt_cb);
+    ga__mod__perl(pop, adult, pop_data->adapt_cb);
     ga_evaluate__perl(pop, adult);
     return adult;
 }
 
 static boolean
 ga_seed__perl(population *pop, entity *joe) {
-    ga_mod__perl(pop, joe, pop_data->seed_cb);
+    ga__mod__perl(pop, joe, pop_data->seed_cb);
 }
 
 static boolean
