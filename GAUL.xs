@@ -222,7 +222,7 @@ typedef GAgeneration_hook GAstop;
 
 #define delete_opt_cb_with_key(table, key, def) (GA ## key)sv_to_cb(delete_opt(#key), table_for_ga_ ## table, #key, &(pop_data->key ## _cb), def)
 
-MODULE = AI::GAUL		PACKAGE = AI::GAUL		
+MODULE = Algorithm::GAUL		PACKAGE = Algorithm::GAUL		
 
 population *
 genesis_any(klass, opts)
@@ -379,7 +379,7 @@ OUTPUT:
     RETVAL
 
 
-MODULE = AI::GAUL		PACKAGE = AI::GAUL    PREFIX = ga_
+MODULE = Algorithm::GAUL		PACKAGE = Algorithm::GAUL    PREFIX = ga_
 
 int
 ga_evolution(pop, max_generations)
@@ -564,6 +564,6 @@ ga_random_seed(seed)
 BOOT:
     ga_init_openmp();
     random_init();
-    population_stash = gv_stashpv("AI::GAUL::Population", 1);
+    population_stash = gv_stashpv("Algorithm::GAUL::Population", 1);
 
 

@@ -8,7 +8,7 @@ use 5.010;
 use Bit::Grep qw(bg_count_sum_and_sum2 bg_count_and_sum);
 use Bit::Util qw(bu_first bu_last);
 use List::Util qw(sum);
-use AI::GAUL;
+use Algorithm::GAUL;
 
 my $fn = shift // die "test data file name missing";
 
@@ -123,19 +123,19 @@ sub adapt {
     }
 }
 
-my $pop = AI::GAUL->new(len_chromo => $size,
-                        population_size => 10000,
-                        seed => "random",
-                        mutate_ratio => 0.02,
-                        mutate => "multipoint",
-                        crossover => "allele_mixing",
-                        evaluate => \&evaluate,
-                        adapt => \&adapt,
-                        stop => \&stop,
-                        scheme => "lamarck_children",
-                        elitism => "parents_die",
-                        # seed => sub { $_[1] = $seed }
-                       );
+my $pop = Algorithm::GAUL->new(len_chromo => $size,
+                               population_size => 20000,
+                               mutate_ratio => 0.2,
+                               mutate => "multipoint",
+                               crossover => "allele_mixing",
+                               evaluate => \&evaluate,
+                               adapt => \&adapt,
+                               stop => \&stop,
+                               scheme => "lamarck_children",
+                               elitism => "parents_die",
+                               #seed => "random",
+                               seed => sub { $_[1] = $naive }
+                              );
 
 while (1) {
     $pop->evolution(2);

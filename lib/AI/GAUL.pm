@@ -1,4 +1,4 @@
-package AI::GAUL;
+package Algorithm::GAUL;
 
 our $VERSION = '0.01';
 
@@ -6,7 +6,7 @@ use strict;
 use warnings;
 
 require XSLoader;
-XSLoader::load('AI::GAUL', $VERSION);
+XSLoader::load('Algorithm::GAUL', $VERSION);
 
 sub new {
     my ($class, %opts) = @_;
@@ -18,11 +18,11 @@ __END__
 
 =head1 NAME
 
-AI::GAUL - Perl wrapper for the Genetic Algorithm Utility Library
+Algorithm::GAUL - Perl wrapper for the Genetic Algorithm Utility Library
 
 =head1 SYNOPSIS
 
-  use AI::GAUL;
+  use Algorithm::GAUL;
 
   sub evaluate {
     my ($pop, $chromo) = @_;
@@ -30,7 +30,7 @@ AI::GAUL - Perl wrapper for the Genetic Algorithm Utility Library
     (unpack "b*", $chromo) =~ tr/1//;
   }
 
-  my $pop = AI::GAUL->new(len_chromo => 100,
+  my $pop = Algorithm::GAUL->new(len_chromo => 100,
                           population_size => 1000,
                           evaluate => \&evaluate);
 
@@ -45,7 +45,7 @@ AI::GAUL - Perl wrapper for the Genetic Algorithm Utility Library
 
 =head1 DESCRIPTION
 
-AI::GAUL is a perl wrapper for the Genetic Algorithm Utility Library
+Algorithm::GAUL is a perl wrapper for the Genetic Algorithm Utility Library
 (GAUL).
 
  WARNING:
@@ -57,7 +57,7 @@ AI::GAUL is a perl wrapper for the Genetic Algorithm Utility Library
 
 =head2 Why another GA in Perl?
 
-The aim behind AI::GAUL was to have an efficient and easy to use GA
+The aim behind Algorithm::GAUL was to have an efficient and easy to use GA
 usable from Perl.
 
 Using the GAUL library as the base, has also resulted in a flexible
@@ -94,9 +94,9 @@ C<vec> for bitstrings) can be used to extract the data.
 
 =over 4
 
-=item $pop = AI::GAUL->new(%opts)
+=item $pop = Algorithm::GAUL->new(%opts)
 
-Creates a new object of type AI::GAUL (AKA the population object)
+Creates a new object of type Algorithm::GAUL (AKA the population object)
 
 The options accepted are:
 

@@ -1,6 +1,6 @@
-Revision history for Perl extension AI::GAUL.
+Revision history for Perl extension Algorithm::GAUL.
 
 0.01  Fri Sep  3 10:03:34 2010
 	- original version; created by h2xs 1.23 with options
-		-An AI::GAUL
+		-An Algorithm::GAUL
 

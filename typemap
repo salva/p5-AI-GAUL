@@ -3,14 +3,14 @@ population * T_POP
 
 INPUT
 T_POP
-        if (sv_isa($arg, \"AI::GAUL\")) {
+        if (sv_isa($arg, \"Algorithm::GAUL\")) {
             IV tmp = SvIV((SV*)SvRV($arg));
             $var = INT2PTR($type, tmp);
         }
         else
-            croak(\"$var is not of type AI::GAUL\");
+            croak(\"$var is not of type Algorithm::GAUL\");
 
 OUTPUT
 T_POP
-        sv_setref_pv($arg, \"AI::GAUL\", $var);
+        sv_setref_pv($arg, \"Algorithm::GAUL\", $var);
         pop_data->wrapper = sv_rvweaken(newSVsv($arg));

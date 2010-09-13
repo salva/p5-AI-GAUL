@@ -7,7 +7,7 @@ use 5.010;
 
 use blib;
 use Data::Dumper;
-use AI::GAUL;
+use Algorithm::GAUL;
 
 $| = 1;
 
@@ -38,13 +38,13 @@ sub stop {
     $fitness >= $len;
 }
 
-my $p = AI::GAUL->new(num_chromo => 5,
-                      population_size => 100,
-                      len_chromo => 30,
-                      evaluate => \&evaluate,
-                      adapt => \&adapt,
-                      stop => \&stop,
-                      scheme => "lamarck_children" );
+my $p = Algorithm::GAUL->new(num_chromo => 5,
+                             population_size => 100,
+                             len_chromo => 30,
+                             evaluate => \&evaluate,
+                             adapt => \&adapt,
+                             stop => \&stop,
+                             scheme => "lamarck_children" );
 
 say "evolution...";
 
