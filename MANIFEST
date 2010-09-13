@@ -4,5 +4,5 @@ Makefile.PL
 MANIFEST
 ppport.h
 README
-t/AI-GAUL.t
-lib/AI/GAUL.pm
+t/Algorithm-GAUL.t
+lib/Algorithm/GAUL.pm
