@@ -12,16 +12,20 @@ use Algorithm::GAUL;
 
 my $fn = shift // die "test data file name missing";
 
+my $n = shift // 1000;
+my $bottom = shift // 1000;
+my $top = shift // 1001;
+
+print "n: $n, bottom: $bottom, top: $top\n";
+
 open my $fh, '<', $fn or die "unable to open $fn";
 my @size = map { int $_ } grep /^\d/, <$fh>;
 close $fh;
 
-$#size = 999;
+$#size = $n - 1;
 @size = sort { $a <=> $b } @size;
 
 my $size = scalar @size;
-
-my ($bottom, $top) = (1000, 1001);
 
 my $naive = '';
 for (0..$#size) { vec($naive, $_, 1) = 1 };
@@ -124,7 +128,8 @@ sub adapt {
 }
 
 my $pop = Algorithm::GAUL->new(len_chromo => $size,
-                               population_size => 20000,
+                               population_size => 300,
+                               select_two => "linearrank",
                                mutate_ratio => 0.2,
                                mutate => "multipoint",
                                crossover => "allele_mixing",
@@ -132,13 +137,13 @@ my $pop = Algorithm::GAUL->new(len_chromo => $size,
                                adapt => \&adapt,
                                stop => \&stop,
                                scheme => "lamarck_children",
-                               elitism => "parents_die",
-                               #seed => "random",
-                               seed => sub { $_[1] = $naive }
+                               elitism => "rescore_parents",
+                               seed => "zero",
+                               #seed => sub { $_[1] = $naive }
                               );
 
 while (1) {
-    $pop->evolution(2);
+    $pop->evolution(1);
     my $chromo = $pop->chromosomes_from_rank(0);
     my ($cnt, $sum, $sum2) = bg_count_sum_and_sum2($chromo, @size);
     $cnt ||= 1;
