@@ -76,10 +76,29 @@ ga__mod__perl(population *pop, entity *joe, SV *perl_cb) {
 
 static entity *
 ga_adapt__perl(population *pop, entity *child) {
+    /* the child grows into an adult */
     entity *adult = ga_entity_clone(pop, child);
     ga__mod__perl(pop, adult, pop_data->adapt_cb);
     ga_evaluate__perl(pop, adult);
     return adult;
+}
+
+static void
+ga_mutate__perl(population *pop, entity *father, entity *son) {
+    int i;
+
+    /* Checks */
+    if (!father || !son) Perl_croak(aTHX_ "Null pointer to entity structure passed");
+
+    /* Copy chromosomes of parent to offspring. */
+    for (i=0; i < pop->num_chromosomes; i++)
+        ga_bit_clone(son->chromosome[i], father->chromosome[i], pop->len_chromosomes);
+    
+    /*
+     * Mutate by flipping random bits.
+     */
+
+    ga__mod__perl(pop, son, pop_data->mutate_cb);
 }
 
 static boolean

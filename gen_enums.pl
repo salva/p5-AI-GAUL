@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 
 use 5.010;
-
 use strict;
 use warnings;
 
@@ -26,7 +25,8 @@ my %cb = map { $_ => [] } qw(ga_select_one ga_select_two
 push @{$cb{$_}}, "_perl" for qw(ga_evaluate ga_adapt ga_stop
                                 ga_seed_bitstring ga_seed_boolean
                                 ga_seed_char ga_seed_integer
-                                ga_seed_double);
+                                ga_seed_double
+                                ga_mutate_bitstring);
 
 my $base = '';
 my $table = '';

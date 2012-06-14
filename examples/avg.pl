@@ -48,6 +48,7 @@ my $iteration = 1;
 my $pow = 1;
 
 sub evaluate {
+    say "evaluating...";
     my ($cnt, $sum, $sum2) = bg_count_sum_and_sum2($_[1], @size);
     if ($cnt) {
         my $avg = $sum / $cnt;
@@ -99,6 +100,7 @@ sub find_ge_ix {
 }
 
 sub adapt {
+    say "adapting...";
     my ($cnt, $sum) = bg_count_and_sum($_[1], @size);
     while ($cnt) {
         my $avg = ($sum / $cnt);

@@ -92,15 +92,46 @@ my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
 
     embryo->chromosome = s_malloc(pop->num_chromosomes * sizeof(byte *));
     
-    bytes = (pop->len_chromosomes + 7) / 8;
+    bytes = (pop->len_chromosomes + 7) / 8 + 1;
     for (i = 0; i < pop->num_chromosomes; i++) {
         byte *chromo = (byte *)s_malloc(bytes);
         if (!chromo) die("Unable to allocate bitstring");
-        if (bytes) chromo[bytes - 1] = 0; /* clear extra bits in the last byte */
+        if (bytes > 1) chromo[bytes - 2] = 0; /* clear extra bits in the last byte */
+        chromo[bytes - 1] = 0;
         embryo->chromosome[i] = chromo;
     }
     return TRUE;
 }
+
+/* static boolean */
+/* my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  { */
+/*     int i;		/\* Loop variable over all chromosomes *\/ */
+/*     int bytes; */
+/*     SV **wrapper; */
+/*     AV *av; */
+/*     SV *chromo; */
+
+/*     /\* TODO: preallocate entities as perl objects *\/ */
+
+/*     if (!pop) die("Null pointer to population structure passed."); */
+/*     if (!embryo) die("Null pointer to entity structure passed."); */
+
+/*     if (embryo->chromosome != NULL) */
+/*         die("This entity already contains chromosomes."); */
+
+/*     SV **wrapper = s_malloc((1 + pop->num_chromosomes) * sizeof(SV *)); */
+
+/*     embryo->chromosome = wrapper + 1; */
+    
+/*     bytes = (pop->len_chromosomes + 7) / 8; */
+/*     for (i = 0; i < pop->num_chromosomes; i++) { */
+/*         byte *chromo = (byte *)s_malloc(bytes); */
+/*         if (!chromo) die("Unable to allocate bitstring"); */
+/*         if (bytes) chromo[bytes - 1] = 0; /\* clear extra bits in the last byte *\/ */
+/*         embryo->chromosome[i] = chromo; */
+/*     } */
+/*     return TRUE; */
+/* } */
 
 static unsigned int
 my_ga_chromosome_bitstring_to_bytes(const population *pop,
@@ -525,7 +556,6 @@ CODE:
 OUTPUT:
     RETVAL
 
-
 void
 DESTROY(pop)
     population *pop
@@ -555,11 +585,6 @@ CODE:
         ga_extinction(pop);
         sv_setiv(SvRV(ST(0)), 0);
     }
-
-void
-ga_random_seed(seed)
-    int seed
-
 
 BOOT:
     ga_init_openmp();
