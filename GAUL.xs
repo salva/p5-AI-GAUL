@@ -18,9 +18,6 @@ static HV *population_stash;
 struct my_data {
     SV *wrapper;
     int chromosome_bytes;
-    SV **chromosome_svs;
-    byte *bytes;
-    unsigned int max_bytes;
     SV *evaluate_cb;
     SV *adapt_cb;
     SV *stop_cb;
@@ -33,26 +30,6 @@ struct my_data {
 };
 
 #define pop_data ((struct my_data *)((pop)->data))
-
-static SV*
-get_chromosome_sv(population *pop, int i) {
-    SV **svs = pop_data->chromosome_svs;
-    SV *sv = svs[i];
-    if (SvREFCNT(sv) > 1) {
-        SV *alt = svs[pop->num_chromosomes];
-        if (SvREFCNT(alt) > 1) {
-          // fprintf(stderr, "(sv realloc)"); fflush(stderr);
-            sv_2mortal(sv);
-            return pop_data->chromosome_svs[i] = newSV(pop_data->chromosome_bytes);
-        }
-        else {
-            svs[pop->num_chromosomes] = sv;
-            svs[i] = alt;
-            return alt;
-        }
-    }
-    return sv;
-}
 
 enum slots_ {
     av_slot_ptr = 0,
@@ -79,39 +56,121 @@ struct cb_table {
     cb_C cb;
 };
 
-static boolean
-my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
-    int i;		/* Loop variable over all chromosomes */
-    int bytes;
+static void
+my_ga_entity_wrapper_set_ro(SV *w) {
+    AV *av = (AV*)SvRV(w);
+    SV **svp = AvARRAY(av);
+    int i, len = av_len(av);
+    for (i = 0; i <= len; i++) SvREADONLY_on(svp[i]);
+}
 
+static void
+my_ga_entity_wrapper_set_rw(SV *w) {
+    AV *av = (AV*)SvRV(w);
+    SV **svp = AvARRAY(av);
+    int i, len = av_len(av);
+    for (i = 0; i <= len; i++) SvREADONLY_off(svp[i]);
+}
+
+static void
+my_ga_entity_wrapper_after_rw(population *pop, entity *joe, SV *w) {
+    gaulbyte **chromo = (gaulbyte **)joe->chromosome;
+    AV *av = (AV*)SvRV(w);
+    SV **svp = AvARRAY(av);
+    int i, av_len = av_len(av);
+    int bytes = pop_data->chromosome_bytes;
+    for (i = 0; i <= av_len; i++) {
+        STRLEN len;
+        SV *sv = svp[i];
+        *(chromo++) = SvPV(sv, len);
+        if (len < bytes)
+            croak("invalid size %d for chromosome, %d expected", len, bytes);
+        SvREADONLY_on(sv);
+    }
+}
+
+static boolean
+my_ga_chromosome_allocate(population *pop, entity *embryo, size_t size)  {
+    int i;
+    SV **mem, *wrapper;
+    AV *av;
+    
     if (!pop) die("Null pointer to population structure passed.");
     if (!embryo) die("Null pointer to entity structure passed.");
 
     if (embryo->chromosome != NULL)
         die("This entity already contains chromosomes.");
 
-    embryo->chromosome = s_malloc(pop->num_chromosomes * sizeof(byte *));
+    mem = s_malloc((1 + pop->num_chromosomes) * sizeof(SV *));
+
+    av = newAV();
+    *mem = wrapper = newRV_noinc((SV*)av);
+    av_extend(av, pop->num_chromosomes - 1);
+
+    embryo->chromosome = (void **)(mem + 1);
     
-    bytes = (pop->len_chromosomes + 7) / 8 + 1;
     for (i = 0; i < pop->num_chromosomes; i++) {
-        byte *chromo = (byte *)s_malloc(bytes);
-        if (!chromo) die("Unable to allocate bitstring");
-        if (bytes > 1) chromo[bytes - 2] = 0; /* clear extra bits in the last byte */
-        chromo[bytes - 1] = 0;
-        embryo->chromosome[i] = chromo;
+        SV *chromo = newSV(size);
+        char *pv;
+        SvPOK_on(chromo);
+        SvCUR_set(chromo, size);
+        embryo->chromosome[i] = pv = SvPVX(chromo);
+        pv[size] = '\0';
+        av_push(av, chromo);
     }
+    SvREADONLY_on((SV*)av);
+    SvREADONLY_on(wrapper);
+    my_ga_entity_wrapper_set_ro(wrapper);
     return TRUE;
+}
+
+static boolean
+my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
+    size_t size = (pop->len_chromosomes + 7) / 8;
+    if (my_ga_chromosome_allocate(pop, embryo, size)) {
+        if (pop->len_chromosomes & 7) {
+            int i;
+            for (i = 0; i < pop->num_chromosomes; i++) {
+                gaulbyte *pv = embryo->chromosome[i];
+                pv[size - 1] = 0;
+            }
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static SV *
+my_ga_entity_wrapper(entity *joe) {
+    SV **mem;
+    if (!joe) die("Null pointer to entity structure passed.");
+    
+    if (joe->chromosome == NULL)
+        die("This entity does not contain chromosomes.");
+    
+    mem = ((SV **)(joe->chromosome)) - 1;
+    return *mem;
+}
+
+static void
+my_ga_chromosome_deallocate(population *pop, entity *corpse) {
+    SV **mem;
+    if (!pop) die("Null pointer to population structure passed.");
+    if (!corpse) die("Null pointer to entity structure passed.");
+    
+    if (corpse->chromosome == NULL)
+        die("This entity does not contain chromosomes.");
+    
+    mem = ((SV **)(corpse->chromosome)) - 1;
+    SvREFCNT_dec(*mem);
+    s_free(mem);
+    corpse->chromosome = NULL;
 }
 
 /* static boolean */
 /* my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  { */
 /*     int i;		/\* Loop variable over all chromosomes *\/ */
 /*     int bytes; */
-/*     SV **wrapper; */
-/*     AV *av; */
-/*     SV *chromo; */
-
-/*     /\* TODO: preallocate entities as perl objects *\/ */
 
 /*     if (!pop) die("Null pointer to population structure passed."); */
 /*     if (!embryo) die("Null pointer to entity structure passed."); */
@@ -119,15 +178,14 @@ my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
 /*     if (embryo->chromosome != NULL) */
 /*         die("This entity already contains chromosomes."); */
 
-/*     SV **wrapper = s_malloc((1 + pop->num_chromosomes) * sizeof(SV *)); */
-
-/*     embryo->chromosome = wrapper + 1; */
+/*     embryo->chromosome = s_malloc(pop->num_chromosomes * sizeof(byte *)); */
     
-/*     bytes = (pop->len_chromosomes + 7) / 8; */
+/*     bytes = (pop->len_chromosomes + 7) / 8 + 1; */
 /*     for (i = 0; i < pop->num_chromosomes; i++) { */
 /*         byte *chromo = (byte *)s_malloc(bytes); */
 /*         if (!chromo) die("Unable to allocate bitstring"); */
-/*         if (bytes) chromo[bytes - 1] = 0; /\* clear extra bits in the last byte *\/ */
+/*         if (bytes > 1) chromo[bytes - 2] = 0; /\* clear extra bits in the last byte *\/ */
+/*         chromo[bytes - 1] = 0; */
 /*         embryo->chromosome[i] = chromo; */
 /*     } */
 /*     return TRUE; */
@@ -136,7 +194,7 @@ my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
 static unsigned int
 my_ga_chromosome_bitstring_to_bytes(const population *pop,
                                     entity *joe,
-                                    byte **bytes, unsigned int *max_bytes) {
+                                    gaulbyte **bytes, unsigned int *max_bytes) {
     int num_bytes;	/* Actual size of genes. */
     int i;		/* Loop variable over all chromosomes */
 
@@ -164,14 +222,6 @@ my_ga_chromosome_bitstring_to_bytes(const population *pop,
     }
 
     return num_bytes;
-}
-
-static SV *
-entity_to_sv(population *pop, entity *joe) {
-    SV *sv;
-    /* fprintf(stderr, "bytes: %p, max_bytes: %d\n", pop_data->bytes, pop_data->max_bytes); fflush(stderr); */
-    int len = pop->chromosome_to_bytes(pop, joe, &(pop_data->bytes), &(pop_data->max_bytes));
-    return newSVpvn(pop_data->bytes, len);
 }
 
 static int
@@ -293,6 +343,11 @@ CODE:
 
     pop->generation_hook = delete_opt_cb(stop, NULL);
 
+    pop_data->wrapper = newSV(0);
+    sv_setref_pv(pop_data->wrapper, "Algorithm::GAUL", pop);
+    SvREADONLY_on(pop_data->wrapper);
+    SvREADONLY_on(SvRV(pop_data->wrapper));
+
     sv = delete_opt("scheme");
     if (SvOK(sv))
         ga_population_set_scheme(pop, sv_to_enum(sv, table_for_ga_scheme_type_t, "scheme", 0));
@@ -321,7 +376,7 @@ CODE:
     switch (sv_to_enum(sv, table_for_chromo_type_t, "type_chromo", GA_CHROMO_TYPE_BITSTRING)) {
     case GA_CHROMO_TYPE_BITSTRING:
         pop->chromosome_constructor = my_ga_chromosome_bitstring_allocate;
-        pop->chromosome_destructor = ga_chromosome_bitstring_deallocate;
+        pop->chromosome_destructor = my_ga_chromosome_deallocate;
         pop->chromosome_replicate = ga_chromosome_bitstring_replicate;
         pop->chromosome_to_bytes = my_ga_chromosome_bitstring_to_bytes;
         pop->chromosome_from_bytes = ga_chromosome_bitstring_from_bytes;
@@ -398,10 +453,6 @@ CODE:
         croak("bad chromo type");
     }
 
-    Newxz(data->chromosome_svs, num_chromo + 1, SV*);
-    for (i = 0; i <= num_chromo; i++)
-        data->chromosome_svs[i] = newSV(data->chromosome_bytes);
-
     ga_population_seed(pop);
 
     RETVAL = pop;
@@ -462,7 +513,7 @@ PPCODE:
         XSRETURN(0);
 
 int
-ga_id_from_rank(pop, rank)
+ga_id_by_rank(pop, rank)
     population *pop
     int rank
 CODE:
@@ -470,70 +521,56 @@ CODE:
 OUTPUT:
     RETVAL
 
-void
-ga_chromosomes_from_id(pop, id)
+SV *
+ga_entity_by_id(pop, id)
     population *pop
     int id
 PREINIT:
     entity *joe;
-PPCODE:
-    if (joe = ga_get_entity_from_id(pop, id)) {
-        int i;
-        byte **chromo = (byte**)joe->chromosome;
-        int bytes = pop_data->chromosome_bytes;
-        for (i = 0; i < pop->num_chromosomes; i++)
-            XPUSHs(chromo ? sv_2mortal(newSVpvn(chromo[i], bytes)) : &PL_sv_undef);
-        XSRETURN(i);
-    }
-    else XSRETURN(0);
-
-void
-ga_chromosomes_from_rank(pop, rank)
-    population *pop
-    int rank
-PREINIT:
-    entity *joe;
-PPCODE:
-    if (joe = ga_get_entity_from_rank(pop, rank)) {
-        int i;
-        byte **chromo = (byte**)joe->chromosome;
-        int bytes = pop_data->chromosome_bytes;
-        for (i = 0; i < pop->num_chromosomes; i++)
-            XPUSHs(chromo ? sv_2mortal(newSVpvn(chromo[i], bytes)) : &PL_sv_undef);
-        XSRETURN(i);
-    }
-    else XSRETURN(0);
-
-SV *
-ga_fitness_from_rank(pop, rank)
-    population *pop
-    int rank
-PREINIT:
-    entity *joe;
 CODE:
-    if (joe = ga_get_entity_from_rank(pop, rank)) {
-        RETVAL = newSVnv(joe->fitness);
-    }
-    else RETVAL = &PL_sv_undef;
+    joe = ga_get_entity_from_id(pop, id);
+    RETVAL = (joe ? newSVsv(my_ga_entity_wrapper(joe)) : &PL_sv_undef);
 OUTPUT:
     RETVAL
 
 SV *
-ga_fitness_from_id(pop, id)
+ga_entity_by_rank(pop, rank)
+    population *pop
+    int rank
+PREINIT:
+    entity *joe;
+CODE:
+    joe = ga_get_entity_from_rank(pop, rank);
+    RETVAL = (joe ? newSVsv(my_ga_entity_wrapper(joe)) : &PL_sv_undef);
+OUTPUT:
+    RETVAL
+
+SV *
+ga_fitness_by_rank(pop, rank)
+    population *pop
+    int rank
+PREINIT:
+    entity *joe;
+CODE:
+    joe = ga_get_entity_from_rank(pop, rank);
+    RETVAL = (joe ? newSVnv(joe->fitness) : &PL_sv_undef);
+OUTPUT:
+    RETVAL
+
+SV *
+ga_fitness_by_id(pop, id)
     population *pop
     int id
 PREINIT:
     entity *joe;
 CODE:
-    if (joe = ga_get_entity_from_id(pop, id)) {
-        RETVAL = newSVnv(joe->fitness);
-    }
-    else RETVAL = &PL_sv_undef;
+    joe = ga_get_entity_from_id(pop, id);
+    RETVAL = (joe ? newSVnv(joe->fitness) : &PL_sv_undef);
 OUTPUT:
     RETVAL
 
 int
-ga_len_chromo(pop)
+ga_chromosome_length(pop)
     population *pop
 CODE:
     RETVAL = pop->len_chromosomes;
@@ -541,7 +578,7 @@ OUTPUT:
     RETVAL
 
 int
-ga_num_chromo(pop)
+ga_num_chromosomes(pop)
     population *pop
 CODE:
     RETVAL = pop->num_chromosomes;
@@ -565,12 +602,6 @@ PREINIT:
 CODE:
     if (pop) {
         if (data = pop_data) {
-            if (svs = data->chromosome_svs) {
-                int i;
-                for (i= 0; i <= pop->num_chromosomes; i++) sv_2mortal(svs[i]);
-                Safefree(svs);
-            }
-            if (data->max_bytes) s_free(data->bytes);
             if (data->evaluate_cb) SvREFCNT_dec(data->evaluate_cb);
             if (data->adapt_cb) SvREFCNT_dec(data->adapt_cb);
             if (data->stop_cb) SvREFCNT_dec(data->stop_cb);
@@ -580,6 +611,7 @@ CODE:
             if (data->seed_cb) SvREFCNT_dec(data->seed_cb);
             if (data->mutate_cb) SvREFCNT_dec(data->mutate_cb);
             if (data->crossover_cb) SvREFCNT_dec(data->replace_cb);
+            if (data->wrapper) sv_2mortal(data->wrapper);
             pop->data = NULL;
         }
         ga_extinction(pop);

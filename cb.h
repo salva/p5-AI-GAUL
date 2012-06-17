@@ -2,28 +2,20 @@
 static boolean
 ga_evaluate__perl(population *pop, entity *joe) {
     dSP;
-    int i;
-    int count;
-    boolean ret;
     SV *ret_sv;
-    int bytes = pop_data->chromosome_bytes;
-    SV *perl_cb = pop_data->evaluate_cb;
-    byte **chromo = (byte **)joe->chromosome;
+    boolean ret;
+    int count;
 
-    if (!chromo) croak("bad entity");
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
-    XPUSHs(sv_2mortal(newSVsv(pop_data->wrapper)));
-    for (i = 0; i < pop->num_chromosomes; i++) {
-        SV *sv = get_chromosome_sv(pop, i);
-        sv_setpvn(sv, chromo[i], bytes);
-        XPUSHs(sv);
-    }
+    EXTEND(SP, 2);
+    PUSHs(pop_data->wrapper);
+    PUSHs(my_ga_entity_wrapper(joe));
     PUTBACK;
-    count = call_sv(perl_cb, G_SCALAR);
+    count = call_sv(pop_data->evaluate_cb, G_SCALAR);
     SPAGAIN;
-    if (count != 1) croak("callback did not return a value");
+    if (count != 1) croak("Callback did not return a value");
     ret_sv = POPs;
     if (SvOK(ret_sv)) {
         ret = 1;
@@ -38,45 +30,73 @@ ga_evaluate__perl(population *pop, entity *joe) {
     return ret;
 }
 
-static boolean
-ga__mod__perl(population *pop, entity *joe, SV *perl_cb) {
+ga_crossover__perl(population *pop,
+                   entity *father, entity *mother,
+                   entity *son, entity *daughter) {
     dSP;
-    int i;
-    byte **chromo = (byte **)joe->chromosome;
-    SV **svs = pop_data->chromosome_svs;
-    int bytes = pop_data->chromosome_bytes;
 
-    if (!chromo) croak("bad entity");
+    SV *wrapper_father, *wrapper_mother,
+       *wrapper_son, *wrapper_daughter;
+
+    if (!father || !mother || !son || !daughter)
+        croak("Internal error: null pointer to entity structure passed");
+
+    wrapper_father   = my_ga_entity_wrapper(father);
+    wrapper_mother   = my_ga_entity_wrapper(mother);
+    wrapper_son      = my_ga_entity_wrapper(son);
+    wrapper_daughter = my_ga_entity_wrapper(daughter);
+
+    my_ga_entity_wrapper_set_rw(wrapper_son);
+    my_ga_entity_wrapper_set_rw(wrapper_daughter);
+
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
-    XPUSHs(sv_2mortal(newSVsv(pop_data->wrapper)));
-    for (i = 0; i < pop->num_chromosomes; i++) {
-        SV *sv = get_chromosome_sv(pop, i);
-        sv_setpvn(sv, chromo[i], bytes);
-        XPUSHs(sv);
-    }
-    // XPUSHs(sv_2mortal(newSV(0)));
+    EXTEND(SP, 5);
+    PUSHs(pop_data->wrapper);
+    PUSHs(wrapper_father);
+    PUSHs(wrapper_mother);
+    PUSHs(wrapper_son);
+    PUSHs(wrapper_daughter);
     PUTBACK;
-    call_sv(perl_cb, G_SCALAR);
+    call_sv(pop_data->crossover_cb, G_VOID);
     SPAGAIN;
     PUTBACK;
     FREETMPS;
     LEAVE;
-    
-    for (i = 0; i < pop->num_chromosomes; i++) {
-        STRLEN len;
-        const char *pv = SvPV_const(svs[i], len);
-        if (len != bytes)
-            croak("invalid size %d for adapted chromosome, %d expected", len, bytes);
-        Copy(pv, chromo[i], bytes, char);
-    }
-    return 1;
+
+    my_ga_entity_wrapper_after_rw(pop, son, wrapper_son);
+    my_ga_entity_wrapper_after_rw(pop, daughter, wrapper_daughter);
+}
+
+static void
+ga__mod__perl(population *pop, entity *joe, SV *perl_cb) {
+    dSP;
+    SV *wrapper;
+
+    if (!joe) croak("Internal error: null pointer to entity structure passed");
+
+    wrapper  = my_ga_entity_wrapper(joe);
+    my_ga_entity_wrapper_set_rw(wrapper);
+
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+    EXTEND(SP, 2);
+    PUSHs(pop_data->wrapper);
+    PUSHs(wrapper);
+    PUTBACK;
+    call_sv(perl_cb, G_VOID);
+    SPAGAIN;
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+
+    my_ga_entity_wrapper_after_rw(pop, joe, wrapper);
 }
 
 static entity *
 ga_adapt__perl(population *pop, entity *child) {
-    /* the child grows into an adult */
     entity *adult = ga_entity_clone(pop, child);
     ga__mod__perl(pop, adult, pop_data->adapt_cb);
     ga_evaluate__perl(pop, adult);
@@ -86,52 +106,42 @@ ga_adapt__perl(population *pop, entity *child) {
 static void
 ga_mutate__perl(population *pop, entity *father, entity *son) {
     int i;
-
-    /* Checks */
     if (!father || !son) Perl_croak(aTHX_ "Null pointer to entity structure passed");
-
-    /* Copy chromosomes of parent to offspring. */
     for (i=0; i < pop->num_chromosomes; i++)
         ga_bit_clone(son->chromosome[i], father->chromosome[i], pop->len_chromosomes);
-    
-    /*
-     * Mutate by flipping random bits.
-     */
-
     ga__mod__perl(pop, son, pop_data->mutate_cb);
 }
 
 static boolean
 ga_seed__perl(population *pop, entity *joe) {
     ga__mod__perl(pop, joe, pop_data->seed_cb);
+    return 1;
 }
 
 static boolean
 ga_stop__perl(int generation, population *pop) {
     dSP;
-    int i;
     int count;
     boolean ret;
     SV *ret_sv;
-    int bytes = pop_data->chromosome_bytes;
-    SV *perl_cb = pop_data->stop_cb;
 
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
-    XPUSHs(sv_2mortal(newSVsv(pop_data->wrapper)));
-    XPUSHs(sv_2mortal(newSVuv(generation)));
+    EXTEND(SP, 2);
+    PUSHs(pop_data->wrapper);
+    PUSHs(sv_2mortal(newSVuv(generation)));
     PUTBACK;
-    count = call_sv(perl_cb, G_SCALAR);
+    count = call_sv(pop_data->stop_cb, G_SCALAR);
     SPAGAIN;
-    if (count != 1) croak("callback did not return a value");
+    if (count != 1)
+        croak("Callback did not return a value");
     ret_sv = POPs;
-    // sv_dump(ret_sv);
     ret = !SvTRUE(ret_sv);
     PUTBACK;
     FREETMPS;
     LEAVE;
-    // fprintf(stderr, "exit cb\n"); fflush(stderr);
-    if (!ret) { fprintf(stderr, "stopping\n"); fflush(stderr); }
+    /*if (!ret) { fprintf(stderr, "stopping\n"); fflush(stderr); } */
     return ret;
 }
+

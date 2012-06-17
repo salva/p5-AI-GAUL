@@ -10,7 +10,8 @@ XSLoader::load('Algorithm::GAUL', $VERSION);
 
 sub new {
     my ($class, %opts) = @_;
-    $class->genesis_any(\%opts);
+    @_ = ($class, \%opts);
+    goto &genesis_any;
 }
 
 1;

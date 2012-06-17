@@ -25,8 +25,13 @@ my %cb = map { $_ => [] } qw(ga_select_one ga_select_two
 push @{$cb{$_}}, "_perl" for qw(ga_evaluate ga_adapt ga_stop
                                 ga_seed_bitstring ga_seed_boolean
                                 ga_seed_char ga_seed_integer
-                                ga_seed_double
-                                ga_mutate_bitstring);
+                                ga_seed_double ga_mutate_bitstring
+                                ga_mutate_boolean ga_mutate_char
+                                ga_mutate_integer ga_mutate_double
+                                ga_crossover_bitstring
+                                ga_crossover_char ga_crossover_boolean
+                                ga_crossover_integer ga_crossover_double
+                              );
 
 my $base = '';
 my $table = '';
@@ -55,7 +60,7 @@ while (<>) {
                 }
             }
         }
-        when (/FUNCPROTO(?:\s+\w+)+\s+(ga_\w+)/) {
+        when (/(?:FUNCPROTO|GAULFUNC)(?:\s+\w+)+\s+(ga_\w+)/) {
             my $func = $1;
             for my $k (keys %cb) {
                 if ($func =~ /^${k}_(\w+)/) {
