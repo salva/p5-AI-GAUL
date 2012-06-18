@@ -12,12 +12,17 @@ use Math::Vector::Real::kdTree;
 use Bit::Util qw(bu_count bu_first);
 use GD;
 
-my $width = 1024;
-
-
 $| = 1;
+my $width = 1024;
+my $r = 4;
+sub scl {
+    my $p = shift;
+    @{0.125 * $width * ($p + [(4) x @$p])}[0, 1];
+}
 
 my $dist = shift @ARGV || 1;
+my $scl_dist = $dist * 0.125 * 2 * $width;
+
 my $pop_size = shift @ARGV || 100;
 my @p;
 
@@ -30,24 +35,8 @@ while (<>) {
 #my $t = Math::Vector::Real::kdTree->new(@p);
 #@p = @p[$t->ordered_by_proximity];
 
-my @cover;
 my $t = Math::Vector::Real::kdTree->new(@p);
-for my $p (@p) {
-    push @cover, [$t->find_in_ball($p, $dist)];
-}
-
-for my $ix (0..$#p) {
-    my $n = 0;
-    my $p = $p[$ix];
-    for my $q (@p) {
-        $n++ if $p->dist2($q) < $dist * $dist
-    }
-    my $c = @{$cover[$ix]};
-    if ($c != $n) {
-        warn "find in ball failed for ix: $ix, c: $c, n: $n";
-    }
-}
-
+my @cover = map [$t->find_in_ball($_, $dist)], @p;
 say "cover generated";
 
 my $missing = '';
@@ -83,36 +72,37 @@ sub repair {
     }
 }
 
+my ($b0, $b1) = Math::Vector::Real->box(@p);
+my $db = $b1 - $b0;
+my $diam = $db->abs;
+
 sub mutate {
     # say "mutate";
     for my $s (@{$_[1]}) {
-        for (0..9) {
-            my $ix = int rand scalar @p;
-            if (vec($s, $ix, 1)) {
+        my $z = $b0 + $db->random_in_box;
+        my $d2 = rand($diam);
+        $d2 *= $d2;
+
+        my $ix = -1;
+        while (defined($ix = bu_first($s, $ix + 1))) {
+            if ($z->dist2($p[$ix]) < $d2) {
                 vec($s, $ix, 1) = 0;
-                my $c = $cover[$ix];
-                vec($s, $c->[rand @$c],  1) = 1;
             }
         }
     }
 }
-
-my ($b0, $b1) = Math::Vector::Real->box(@p);
-my $db = $b1 - $b0;
-
 sub crossover {
     # say "crossing...";
-    my $z = $b0 + $db->random_in_box;
-    my $dir = Math::Vector::Real->random_versor(scalar @$b0);
-
     my $s = \$_[3][0];
     my $d = \$_[4][0];
-
     my $p = $_[1][0];
     my $m = $_[2][0];
 
+    my $z = $b0 + $db->random_in_box;
+    my $d2 = rand($diam);
+    $d2 *= $d2;
     for my $ix (0..$#p) {
-        if ($dir * ($p[$ix] - $z) >= 0) {
+        if ($z->dist2($p[$ix]) < $d2) {
             vec($$s, $ix, 1) = vec($p, $ix, 1);
             vec($$d, $ix, 1) = vec($m, $ix, 1);
         }
@@ -139,8 +129,8 @@ sub seed {
 my $gaul = Algorithm::GAUL->new(len_chromo => scalar(@p),
                                 population_size => $pop_size,
                                 select_two => 'random',
-                                selec_one => 'random',
-                                mutation_ratio => 0.05,
+                                selec_one => 'aggresive',
+                                mutation_ratio => 0.20,
                                 seed => \&seed,
                                 evaluate => \&weight,
                                 adapt => \&repair,
@@ -151,14 +141,8 @@ my $gaul = Algorithm::GAUL->new(len_chromo => scalar(@p),
                                 crossover => \&crossover);
 
 
-sub scl {
-    my $p = shift;
-    @{0.125 * $width * ($p + [4,4])};
-}
 
-my $scl_dist = $dist * 0.125 * 2 * $width;
-
-say "scl_dist: $scl_dist";
+say "iterating...";
 
 my $iteration = 0;
 while (1) {
@@ -202,7 +186,8 @@ while (1) {
     my $mis = bu_count($m);
     my $sol = bu_count($s) + $mis;
 
-    $im->string(gdSmallFont, 4, 4, "iteration: $iteration, sol: $sol, missing: $mis, fit: $fit, len: $len, p: $p", $black);
+    my $next = join(' ', map { @p - $gaul->fitness_by_rank($_) } 1..25);
+    $im->string(gdSmallFont, 4, 4, "iteration: $iteration, sol: $sol, missing: $mis, fit: $fit, p: $p next: $next", $black);
 
     my $name = sprintf("cover-%05d.png", $iteration);
     open my $fh, '>', $name;
