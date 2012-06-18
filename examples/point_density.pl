@@ -123,12 +123,25 @@ sub crossover {
     }
 }
 
+sub seed {
+    for my $s (@{$_[1]}) {
+        $s = "\x00" x length $s;
+        my $m = $missing;
+        my $ix = -1;
+        while (defined ($ix = bu_first($m, $ix + 1))) {
+            my $c = $cover[$ix][rand scalar @{$cover[$ix]}];
+            vec($s, $c, 1) = 1;
+            vec($s, $_, 1) = 0 for @{$cover[$c]};
+        }
+    }
+}
+
 my $gaul = Algorithm::GAUL->new(len_chromo => scalar(@p),
                                 population_size => $pop_size,
                                 select_two => 'random',
                                 selec_one => 'random',
                                 mutation_ratio => 0.05,
-                                seed => 'random',
+                                seed => \&seed,
                                 evaluate => \&weight,
                                 adapt => \&repair,
                                 stop => \&stop,
