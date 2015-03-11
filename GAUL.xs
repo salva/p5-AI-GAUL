@@ -140,6 +140,14 @@ my_ga_chromosome_bitstring_allocate(population *pop, entity *embryo)  {
     return FALSE;
 }
 
+static boolean
+my_ga_chromosome_double_allocate(population *pop, entity *embryo) {
+    size_t size = pop->len_chromosomes * sizeof(double);
+    if (my_ga_chromosome_allocate(pop, embryo, size))
+        return TRUE;
+    return FALSE;
+}
+
 static SV *
 my_ga_entity_wrapper(entity *joe) {
     SV **mem;
@@ -411,8 +419,8 @@ CODE:
         data->chromosome_bytes = len_chromo * sizeof(char);
         break;
     case GA_CHROMO_TYPE_DOUBLE:
-        pop->chromosome_constructor = ga_chromosome_double_allocate;
-        pop->chromosome_destructor = ga_chromosome_double_deallocate;
+        pop->chromosome_constructor = my_ga_chromosome_double_allocate;
+        pop->chromosome_destructor = my_ga_chromosome_deallocate;
         pop->chromosome_replicate = ga_chromosome_double_replicate;
         pop->chromosome_to_bytes = ga_chromosome_double_to_bytes;
         pop->chromosome_from_bytes = ga_chromosome_double_from_bytes;
