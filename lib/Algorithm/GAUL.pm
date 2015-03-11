@@ -264,9 +264,6 @@ valid.
 For alleles of type C<double> the value C<random_unit_gaussian> is
 also valid.
 
-Currently, custom seed callbacks are not accepted (tell me if you need
-them ;-)
-
 =item crossover => $cb
 
 Accepted values are C<allele_mixing>, C<doublepoints>, C<mixing> and
@@ -274,9 +271,6 @@ C<singlepoints>.
 
 For alleles of type C<double> and C<integer>, the value C<mean> is
 also valid.
-
-Currently, custom crossover callbacks are not supported (tell me if
-you need them ;-)
 
 =item mutate => $cb
 
@@ -288,9 +282,6 @@ C<singlepoint_drift> and S<multipoint_drift> are also valid.
 For type C<char>, the values C<printable_allpoint>,
 C<printable_multipoint>, C<printable_singlepoint_drift> and
 C<printable_singlepoint_randomize> are also valid.
-
-Currently, custom mutate callbacks are not supported (again, tell me
-if you need them ;-)
 
 =back
 

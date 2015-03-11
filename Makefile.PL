@@ -8,5 +8,5 @@ WriteMakefile( NAME              => 'Algorithm::GAUL',
                AUTHOR         => 'Salvador Fandiño <sfandino@yahoo.com>',
                LIBS              => ['-L/usr/local/gaul/lib -lgaul -lgaul_util'], # e.g., '-lm'
                INC               => '-I. -I/usr/local/gaul/include', # e.g., '-I. -I/usr/include/other'
-               # OPTIMIZE => '-g -O0',
+               OPTIMIZE => '-g -O0',
              );
